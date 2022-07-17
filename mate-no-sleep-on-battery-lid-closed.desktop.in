@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=mate-no-sleep-on-battery-lid-closed
+Exec=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/@PROJECT_NAME@
+OnlyShowIn=MATE;
