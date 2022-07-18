@@ -17,6 +17,8 @@ static xcb_window_t g_root = 0;
 static GSettings *g_setsMatePower = nullptr;
 static GSettings *g_setsMateScreenSaver = nullptr;
 
+static guint g_timeoutOnXrandrChange = 0;
+
 static bool isLidClosedOnBattery(bool &hasLidOut)
 {
     bool onBattery = false;
@@ -155,6 +157,22 @@ static void processDisplays(bool *hasLidOut = nullptr)
     }
 }
 
+static void stopOnTimeoutOnXrandrChanged()
+{
+    if (g_timeoutOnXrandrChange)
+    {
+        g_source_remove(g_timeoutOnXrandrChange);
+        g_timeoutOnXrandrChange = 0;
+    }
+}
+
+static gboolean onTimeoutOnXrandrChanged(gpointer)
+{
+    g_timeoutOnXrandrChange = 0;
+    processDisplays();
+    return false;
+}
+
 static gboolean processXcbEvents(gint fd, GIOCondition condition, gpointer)
 {
     auto e = xcb_poll_for_event(g_conn);
@@ -166,7 +184,11 @@ static gboolean processXcbEvents(gint fd, GIOCondition condition, gpointer)
         return true;
     }
 
-    processDisplays();
+    if (e->response_type & (XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE | XCB_RANDR_NOTIFY_MASK_OUTPUT_CHANGE | XCB_RANDR_NOTIFY_MASK_OUTPUT_PROPERTY))
+    {
+        stopOnTimeoutOnXrandrChanged();
+        g_timeoutOnXrandrChange = g_timeout_add(500, onTimeoutOnXrandrChanged, nullptr);
+    }
 
     free(e);
 
@@ -214,6 +236,8 @@ int main()
             g_object_unref(mainLoop);
         }
     }
+
+    stopOnTimeoutOnXrandrChanged();
 
     g_object_unref(g_setsMatePower);
     g_object_unref(g_setsMateScreenSaver);
